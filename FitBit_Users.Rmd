@@ -1,0 +1,228 @@
+---
+title: "Bellabeats_Case_Study"
+author: "Stephanie Sun"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **Phases of Data Analysis**
+
+### Bellabeats Case Study for Google Data Analytics Certificate Program
+
+## 1. The Ask
+
+###### -Business Task: How can the client, Bellabeats, grow their market share in the Smart Device industry?
+
+###### -Insight into competitor, FitBit, consumer behaviour will inform opportunities for growth by finding patterns and understanding needs.
+
+###### -Stakeholders: Bellabeat founders - Urska and Sando
+
+## 2. Prepare The Data
+
+##### -Client suggests FitBit data from Kaggle by Mobius
+
+##### -Additional Google Trends data can be used to inform marketing and advertising decisions
+
+##### -Stored in Google Drive Folder for easy access with Sheets in order to verify data integrity
+
+##### -Limitations:Sample size is small and is not a strong representation of the population
+
+## 3. Process The Data
+
+###### -Spreadsheets used to clean data (looked for nulls, inconsistencies, incomplete columns)
+
+###### -R will be used for data exploration
+
+###### -Cleaning documented in notes tab of csv files
+
+## 4. Data Analysis 
+
+###### -Cleaned datasets downloaded as csv files and imported into R Studio
+###### -Analysis completed in R Studio desktop
+###### -**Most users are a healthy BMI and they tracked their daily activity but not weight or sleep**
+
+## 5. Share Findings
+
+###### -Continue scrolling down in this markdown to view findings
+
+## 6. Recommendations and Next Steps
+
+###### -Bellabeats can grow their market share by increasing their advertising campaigns during the holidays to take advantage of increased interest for their competitor during that time
+###### -Messaging can be directed towards healthy users, daily activity tracking, or evening/noon workouts
+###### -Opportunity to grow to new users by researching why there are less overweight users and sleep/weight tracking
+###### -A large sample size and greater timeframe for data collected would provide stronger representation of the population
+
+# **Data Exploration, Visualizations, and Findings**
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+```
+
+```{r install and load packages, message=FALSE, warning=FALSE}
+
+install.packages("tidyverse")
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+```
+
+```{r import datasets, message=FALSE, warning=FALSE}
+fit_bit_gtrend <- read_csv('FitBit google trend - cleaned.csv')
+
+activity <- read_csv('y dailyActivity_merged - dailyActivity_merged.csv')
+
+sleep <- read_csv('y sleepDay_merged - cleaned.csv')
+
+weight <- read_csv('y weightLogInfo_merged - cleaned.csv')
+
+hourly_steps <- read.csv('y hourlySteps_merged - cleaned.csv')
+
+steps <- read.csv('hourly_steps.csv')
+```
+
+#### Only 1 record in the overweight BMI category
+
+```{r Joining Activity and Weight dataframes, warning=FALSE}
+
+activity_weight <- inner_join(activity, weight, by = "Id") %>% 
+  select(Id, TotalSteps, SedentaryMinutes, BMI, WeightPounds) %>% 
+  group_by(Id) %>% 
+  summarize(mean_steps=mean(TotalSteps,na.rm = T),
+            mean_sedentary_minutes=mean(SedentaryMinutes,na.rm = T),
+            mean_bmi=mean(BMI,na.rm = T),
+            mean_weightlbs=mean(WeightPounds,na.rm = T))  
+
+activity_weight
+
+```
+
+#### -Not enough user data to determine if correlation exists between weight and steps
+
+```{r Plot Compares User Weight and Average Daily Steps, echo=FALSE}
+
+ggplot(data=activity_weight, mapping = aes(x=mean_steps, y=mean_weightlbs))+
+  geom_point() +
+  labs(title="User Weight and Average Daily Steps",
+       y="User Weight in lbs", x="Avg. Daily Steps")
+
+```
+
+#### -Dataframe, daily_activity, was created to aggregate average steps by date
+
+```{r Summary table of Average Daily Steps}
+
+daily_activity <- activity %>% 
+  group_by(ActivityDate) %>%
+  summarize(mean_steps=mean(TotalSteps))
+
+daily_activity
+
+```
+
+#### -Sorted daily_activity dataframe by steps to determine if there were more or less activity on certain days of the week
+
+#### -Daily Activity data also visualized in a graph
+
+#### -No correlations or patterns found, data is also insufficient
+
+```{r daily activities sorted by steps}
+
+daily_activity %>% 
+  arrange(mean_steps)
+
+```
+
+```{r visualization of daily activities by date, echo=FALSE}
+
+ggplot(data=daily_activity, aes(x=ActivityDate, y=mean_steps)) +
+  geom_bar(stat = "identity")+
+  labs(title="Average Steps by Date", y="Avg. Steps", x="Date")+
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+#### -Next hourly activity was table and graph were created to see if when users were more active
+
+#### -Found that activity was highest in the evenings and around noon with 6pm being the most active hour
+
+```{r determine hour of day with most steps}
+
+summary_steps <- steps %>% 
+  group_by(Time) %>%
+  summarize(mean_steps=mean(StepTotal)) %>% 
+  arrange(Time)
+
+summary_steps
+
+```
+
+```{r chart of hourly activity, echo=FALSE}
+
+ggplot(data=summary_steps, aes(x=Time, y=mean_steps)) +
+  geom_bar(stat = "identity")+
+  labs(title="Average Steps by Hour of Day", y="Avg. Steps", x="Time (24hr format)")
+
+```
+
+#### -Dataframes were created and joined to compare the total logs tracked
+
+#### -Pivoted to a longer table to visualize in a bar chart
+
+#### -Most users tracked their activity, some tracked their sleep, and few tracked their weight
+
+#### -*data tracked over a month, count of 31 indicated daily tracking*
+
+```{r comparing the count of activity, sleep, weight}
+
+activity_logs<- activity %>% #most users track daily
+  count(Id)
+
+sleep_logs<- sleep %>% #some users track
+  count(Id)
+
+
+weight_logs<- weight %>% #few users track
+  count(Id)
+
+
+logs <- full_join(activity_logs, sleep_logs, by = "Id") %>%
+  full_join(weight_logs, by = "Id") %>% 
+  rename(activity = n.x, sleep = n.y, weight=n)
+
+logs
+
+```
+
+```{r long chart format and graph to compare count of logs by type, echo=FALSE, warning=FALSE}
+
+logs_long <- logs %>%
+  pivot_longer(cols = c(activity, sleep, weight), names_to = "type", values_to = "count")
+
+logs_bar<- ggplot(logs_long, aes(x = type, y = count, fill = type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Logs Recorded by Type", x = "Type", y = "Total Logs")
+
+logs_bar
+
+```
+
+#### -Google Trend graph plotted to show when interest in FitBit is at its peak (December/holidays)
+
+#### -This may be something Bellabeats marketing and advertising teams may want to take advantage of
+
+```{r line graph of FitBit interest since 2013, echo=FALSE}
+
+ggplot(data=fit_bit_gtrend, mapping = aes(x=Week, y=interest_over_time))+
+  geom_line()+
+  labs(title="FitBit Google Trends Data", y="Interest Over Time")
+
+```
